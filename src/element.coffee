@@ -29,6 +29,7 @@ module.exports = class Element
     i = 0
     state = IN_TAG_NAME
     currentAttrStart = null
+    exit = no
     while ++i < @_string.length - 1
       char = @_string.charAt(i)
 
@@ -40,6 +41,7 @@ module.exports = class Element
 
         when LOOSE_IN_TAG
           if char is '/' or char is '>' # End of tag
+            exit = yes # Flag to break out of the loop
             break
           else if not /\s/.test char # Beginning of an attr name
             state = IN_ATTRIBUTE_NAME
@@ -51,7 +53,9 @@ module.exports = class Element
             state = BEFORE_ATTRIBUTE_VALUE
           else if /\s/.test char # Either now waiting for an (invalidly-spaced) equals sign, or a boolean value has just been completed
             state = AFTER_ATTRIBUTE_NAME
-          else if /[\>\/]/ # End of tag
+          else if /[\>\/]/.test char
+            i--
+            state = LOOSE_IN_TAG
             break
           # else we're still in the attribute name.
 
@@ -95,14 +99,25 @@ module.exports = class Element
             state = LOOSE_IN_TAG
 
         when IN_ATTRIBUTE_VALUE_NQ
-          if /[\s\>\/]/.test char
+          if /[\s]/.test char
             @_attributes.push
               start: currentAttrStart
               end: i
             currentAttrStart = null
             state = LOOSE_IN_TAG
+          else if /[\>\/]/.test char
+            @_attributes.push
+              start: currentAttrStart
+              end: i
+            currentAttrStart = null
+            i--
+            state = LOOSE_IN_TAG
+            break
 
         else throw new Error 'Bug in here somewhere'
+
+      if exit
+        break # Break out of the loop
 
     if currentAttrStart
       while /[\>\/]/.test @_string.charAt(i)
